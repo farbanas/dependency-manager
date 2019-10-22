@@ -1,70 +1,53 @@
 package main
 
 import (
-	json2 "encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
 )
 
-type nexusItems struct {
-	Items	[]nexusComponent	`json:"items"`
-	ContinuationToken	string	`json:"continuationToken"`
-}
-
-type nexusComponent struct {
-	Id         string	`json:"id"`
-	Repository string	`json:"repository"`
-	Format     string	`json:"format"`
-	Group      string	`json:"group"`
-	Name       string	`json:"name"`
-	Version    string	`json:"version"`
-	Assets     []nexusAsset	`json:"assets"`
-}
-
-type nexusAsset struct {
-	DownloadUrl string	`json:"download_url"`
-	Path        string	`json:"path"`
-	Id          string	`json:"id"`
-	Repository  string	`json:"repository"`
-	Format      string	`json:"format"`
-	Checksum    nexusChecksum	`json:"checksum"`
-}
-
-type nexusChecksum struct {
-	Sha1   string	`json:"sha_1"`
-	Sha256 string	`json:"sha_256"`
-	Md5    string	`json:"md_5"`
-}
+var USERNAME string
+var PASSWORD string
+var NEXUSURL string
 
 func main() {
-	username := os.Getenv("USERNAME")
-	password := os.Getenv("PASSWORD")
-	repo := os.Getenv("REPO")
-	asset := os.Getenv("ASSET")
-	url := fmt.Sprintf("https://%s:%s@nexus.vingd.net/service/rest/v1/search?repository=%s&name=%s&sort=version", username, password, repo, asset)
-	res, err := http.Get(url)
-	if err != nil {
-		log.Fatal(err)
+	USERNAME = os.Getenv("USERNAME")
+	PASSWORD = os.Getenv("PASSWORD")
+	NEXUSURL = os.Getenv("NEXUS_URL")
+
+	config := ReadConfigFile("config.yaml")
+
+	for _, repoConfig := range config.Config {
+		if repoConfig.RepositoryType == "helm" {
+			for _, reqFileDef := range repoConfig.RequirementFiles {
+				repository := HelmRequirements{reqFileDef.Path, nil}
+				process(reqFileDef, repository)
+			}
+		} else if repoConfig.RepositoryType == "pip" {
+			for _, reqFileDef := range repoConfig.RequirementFiles {
+				repository := PipRequirements{reqFileDef.Path, nil}
+				process(reqFileDef, repository)
+			}
+		}
 	}
-	components, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	nexusExtractVersions(components)
 }
 
-func nexusGetPackages() {
-}
+func process(reqDefinition RequirementsDefinition, requirements Requirements) {
+	reader, f := requirements.OpenRequirementsFile()
+	defer f.Close()
+	requirements = requirements.ReadCurrentVersion(reader)
 
-func nexusExtractVersions(components []byte) {
-	var nComponents nexusItems
-	err := json2.Unmarshal(components, &nComponents)
-	if err != nil {
-		log.Fatal(err)
+	libraryVersions := requirements.GetLibraryVersions()
+	for _, req := range libraryVersions {
+		url := fmt.Sprintf("https://%s:%s@%s/service/rest/v1/search?repository=%s&name=%s&sort=version", USERNAME, PASSWORD, NEXUSURL, reqDefinition.Repository, req.Library)
+		assets := NexusGetAssets(url)
+		versions := NexusExtractVersions(assets)
+
+		if len(versions) > 0 {
+			if versions[0] != req.Version {
+				fmt.Printf("%-25s\t%-7s -> %7s\n", req.Library, req.Version, versions[0])
+			}
+		} else {
+			fmt.Println("Could not get version for library:", req.Library)
+		}
 	}
-	fmt.Println(nComponents.Items[0].Version)
 }
