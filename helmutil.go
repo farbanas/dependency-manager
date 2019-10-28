@@ -13,7 +13,7 @@ type HelmDependency struct {
 	Version    string `yaml:"version"`
 }
 
-type HelmDependencies struct {
+type HelmYaml struct {
 	Dependencies []HelmDependency `yaml:"dependencies"`
 }
 
@@ -32,7 +32,7 @@ func (h HelmRequirements) OpenRequirementsFile() (*bufio.Reader, *os.File) {
 }
 
 func (h HelmRequirements) ReadCurrentVersion(reader *bufio.Reader) Requirements {
-	var dependencies HelmDependencies
+	var dependencies HelmYaml
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
 		panic(err)
@@ -45,7 +45,7 @@ func (h HelmRequirements) ReadCurrentVersion(reader *bufio.Reader) Requirements 
 	return h.UnpackDependencies(dependencies)
 }
 
-func (h HelmRequirements) UnpackDependencies(dependencies HelmDependencies) HelmRequirements {
+func (h HelmRequirements) UnpackDependencies(dependencies HelmYaml) HelmRequirements {
 	for _, dependency := range dependencies.Dependencies {
 		if dependency.Repository != "@stable" {
 			h.libraryVersions = append(h.libraryVersions, LibraryVersion{dependency.Name, dependency.Version})

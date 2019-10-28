@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -65,10 +64,6 @@ func NexusExtractVersions(components []byte) []string {
 	for _, item := range nComponents.Items {
 		versions = append(versions, item.Version)
 	}
-	sort.Strings(versions)
-	sort.SliceStable(versions, func(i int, j int) bool {
-		return sortSemVer(versions, i, j, true)
-	})
 	return versions
 }
 

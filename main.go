@@ -1,22 +1,42 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
-var USERNAME string
-var PASSWORD string
-var NEXUSURL string
+var username string
+var password string
+var nexusUrl string
+var configPath	 string
+
+
+func init() {
+	username = os.Getenv("USERNAME")
+	password = os.Getenv("PASSWORD")
+	nexusUrl = os.Getenv("NEXUS_URL")
+	configPath = os.Getenv("CONFIG_PATH")
+
+	flag.StringVar(&username, "username", username, "Username for the Nexus repository")
+	flag.StringVar(&password, "password", password, "Password for the Nexus repository")
+	flag.StringVar(&nexusUrl, "url", nexusUrl, "URL for the Nexus repository")
+	flag.StringVar(&configPath, "config-path", configPath, "Path to config.yaml")
+	flag.Parse()
+}
 
 func main() {
-	USERNAME = os.Getenv("USERNAME")
-	PASSWORD = os.Getenv("PASSWORD")
-	NEXUSURL = os.Getenv("NEXUS_URL")
-
 	config := ReadConfigFile("config.yaml")
+	for i, repoConfig := range config.Config {
+		if i != 0 {
+			fmt.Println()
+		}
+		fmt.Println(strings.Title(repoConfig.RepositoryType), "packages that need update:")
+		strlen := len(repoConfig.RepositoryType) + len("packages that need update:")
+		fmt.Println(strings.Repeat("=", strlen + 1))
 
-	for _, repoConfig := range config.Config {
+
 		if repoConfig.RepositoryType == "helm" {
 			for _, reqFileDef := range repoConfig.RequirementFiles {
 				repository := HelmRequirements{reqFileDef.Path, nil}
@@ -25,6 +45,11 @@ func main() {
 		} else if repoConfig.RepositoryType == "pip" {
 			for _, reqFileDef := range repoConfig.RequirementFiles {
 				repository := PipRequirements{reqFileDef.Path, nil}
+				process(reqFileDef, repository)
+			}
+		} else if repoConfig.RepositoryType == "pom" {
+			for _, reqFileDef := range repoConfig.RequirementFiles {
+				repository := PomRequirements{reqFileDef.Path, nil}
 				process(reqFileDef, repository)
 			}
 		}
@@ -38,7 +63,7 @@ func process(reqDefinition RequirementsDefinition, requirements Requirements) {
 
 	libraryVersions := requirements.GetLibraryVersions()
 	for _, req := range libraryVersions {
-		url := fmt.Sprintf("https://%s:%s@%s/service/rest/v1/search?repository=%s&name=%s&sort=version", USERNAME, PASSWORD, NEXUSURL, reqDefinition.Repository, req.Library)
+		url := fmt.Sprintf("https://%s:%s@%s/service/rest/v1/search?repository=%s&name=%s&sort=version", username, password, nexusUrl, reqDefinition.Repository, req.Library)
 		assets := NexusGetAssets(url)
 		versions := NexusExtractVersions(assets)
 
