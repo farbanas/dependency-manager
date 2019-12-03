@@ -15,12 +15,13 @@ type PomDependency struct {
 }
 
 type PomXML struct {
-		Dependencies []PomDependency `xml:"dependencies>dependency"`
+	Dependencies []PomDependency `xml:"dependencies>dependency"`
 }
 
 type PomRequirements struct {
 	path            string
 	libraryVersions []LibraryVersion
+	data			PomXML
 }
 
 func (p PomRequirements) OpenRequirementsFile() (*bufio.Reader, *os.File) {
@@ -60,4 +61,8 @@ func (p PomRequirements) GetLibraryVersions() []LibraryVersion {
 
 func (p PomRequirements) GetPath() string {
 	return p.path
+}
+
+func (p PomRequirements) UpdateVersion(toUpdate map[string]string) {
+
 }

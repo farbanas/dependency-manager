@@ -10,6 +10,12 @@ type Requirements interface {
 	OpenRequirementsFile() (*bufio.Reader, *os.File)
 	GetLibraryVersions() []LibraryVersion
 	GetPath() string
+	UpdateVersion(map[string]string)
+}
+
+type FileData interface {
+	WriteData()
+	GetDependencies()
 }
 
 type LibraryVersion struct {

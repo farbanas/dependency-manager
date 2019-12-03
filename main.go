@@ -10,8 +10,7 @@ import (
 var username string
 var password string
 var nexusUrl string
-var configPath	 string
-
+var configPath string
 
 func init() {
 	username = os.Getenv("USERNAME")
@@ -26,7 +25,20 @@ func init() {
 	flag.Parse()
 }
 
+func parseVars() {
+	if username == "" {
+		panic("Missing username for nexus repo!")
+	}
+	if password == "" {
+		panic("Missing password for nexus repo!")
+	}
+	if nexusUrl == "" {
+		panic("Missing nexus url!")
+	}
+}
+
 func main() {
+	parseVars()
 	config := ReadConfigFile("config.yaml")
 	for i, repoConfig := range config.Config {
 		if i != 0 {
@@ -34,29 +46,27 @@ func main() {
 		}
 		fmt.Println(strings.Title(repoConfig.RepositoryType), "packages that need update:")
 		strlen := len(repoConfig.RepositoryType) + len("packages that need update:")
-		fmt.Println(strings.Repeat("=", strlen + 1))
-
-
-		if repoConfig.RepositoryType == "helm" {
-			for _, reqFileDef := range repoConfig.RequirementFiles {
-				repository := HelmRequirements{reqFileDef.Path, nil}
-				process(reqFileDef, repository)
+		fmt.Println(strings.Repeat("=", strlen+1))
+		for _, reqFileDef := range repoConfig.RequirementFiles {
+			var repository Requirements
+			if repoConfig.RepositoryType == "helm" {
+				repository = HelmRequirements{reqFileDef.Path, nil, HelmYaml{}}
+			} else if repoConfig.RepositoryType == "pip" {
+				repository = PipRequirements{reqFileDef.Path, nil }
+			} else if repoConfig.RepositoryType == "pom" {
+				repository = PomRequirements{reqFileDef.Path, nil, PomXML{}}
 			}
-		} else if repoConfig.RepositoryType == "pip" {
-			for _, reqFileDef := range repoConfig.RequirementFiles {
-				repository := PipRequirements{reqFileDef.Path, nil}
+			if repository != nil {
 				process(reqFileDef, repository)
-			}
-		} else if repoConfig.RepositoryType == "pom" {
-			for _, reqFileDef := range repoConfig.RequirementFiles {
-				repository := PomRequirements{reqFileDef.Path, nil}
-				process(reqFileDef, repository)
+			} else {
+				fmt.Println("No packages need update!")
 			}
 		}
 	}
 }
 
 func process(reqDefinition RequirementsDefinition, requirements Requirements) {
+	toUpdate := make(map[string]string)
 	reader, f := requirements.OpenRequirementsFile()
 	defer f.Close()
 	requirements = requirements.ReadCurrentVersion(reader)
@@ -69,10 +79,13 @@ func process(reqDefinition RequirementsDefinition, requirements Requirements) {
 
 		if len(versions) > 0 {
 			if versions[0] != req.Version {
+				toUpdate[req.Library] = versions[0]
 				fmt.Printf("%-25s\t%-7s -> %7s\n", req.Library, req.Version, versions[0])
 			}
 		} else {
 			fmt.Println("Could not get version for library:", req.Library)
 		}
 	}
+	fmt.Println("Getting done, starting update")
+	requirements.UpdateVersion(toUpdate)
 }

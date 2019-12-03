@@ -64,3 +64,8 @@ func tokenize(line string) []string {
 	}
 	return tokens
 }
+
+func (p PipRequirements) UpdateVersion(toUpdate map[string]string){
+
+}
+

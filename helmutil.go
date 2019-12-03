@@ -20,6 +20,7 @@ type HelmYaml struct {
 type HelmRequirements struct {
 	path            string
 	libraryVersions []LibraryVersion
+	data 			HelmYaml
 }
 
 func (h HelmRequirements) OpenRequirementsFile() (*bufio.Reader, *os.File) {
@@ -42,10 +43,21 @@ func (h HelmRequirements) ReadCurrentVersion(reader *bufio.Reader) Requirements 
 		panic(err)
 	}
 
+	h.data = dependencies
+
 	return h.UnpackDependencies(dependencies)
 }
 
 func (h HelmRequirements) UnpackDependencies(dependencies HelmYaml) HelmRequirements {
+	for _, dependency := range dependencies.Dependencies {
+		if dependency.Repository != "@stable" {
+			h.libraryVersions = append(h.libraryVersions, LibraryVersion{dependency.Name, dependency.Version})
+		}
+	}
+	return h
+}
+
+func (h HelmRequirements) UpdateDependencies(dependencies HelmYaml) HelmRequirements {
 	for _, dependency := range dependencies.Dependencies {
 		if dependency.Repository != "@stable" {
 			h.libraryVersions = append(h.libraryVersions, LibraryVersion{dependency.Name, dependency.Version})
@@ -60,4 +72,27 @@ func (h HelmRequirements) GetLibraryVersions() []LibraryVersion {
 
 func (h HelmRequirements) GetPath() string {
 	return h.path
+}
+
+func (h HelmRequirements) UpdateVersion(toUpdate map[string]string) {
+	for i, dependency := range h.data.Dependencies {
+		if version := toUpdate[dependency.Name]; version != "" {
+			h.data.Dependencies[i].Version = version
+		}
+	}
+	yamlData, err := yaml.Marshal(h.data)
+	if err != nil {
+		panic(err)
+	}
+
+	f, err := os.Create(h.path)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	_, err = f.Write(yamlData)
+	if err != nil {
+		panic(err)
+	}
 }
